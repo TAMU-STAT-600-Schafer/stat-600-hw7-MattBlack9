@@ -57,18 +57,28 @@ one_pass <- function(X, y, K, W1, b1, W2, b2, lambda){
 
   # [To Do] Forward pass
   # From input to hidden 
+  H <- X %*% W1 + matrix(b1, n, length(b1), byrow = T)
   
   # ReLU
+  H[H < 0] <- 0
   
   # From hidden to output scores
- 
+  scores <- H %*% W2 + b2
   
   # [ToDo] Backward pass
   # Get loss, error, gradient at current scores using loss_grad_scores function
+  loss_grad <- loss_grad_regression(y, scores)
 
   # Get gradient for 2nd layer W2, b2 (use lambda as needed)
+  dW2 <- crossprod(H, loss_grad$grad)
+  db2 <- sum(loss_grad$grad) 
   
   # Get gradient for hidden, and 1st layer W1, b1 (use lambda as needed)
+  dH <- tcrossprod(loss_grad$grad, W2)
+  dA1 <- dH
+  dA1 <- (abs(dA1) + dA1) / 2
+  dW1 <- crossprod(X, dA1)
+  db1 <- colSums(dA1)
   
   # Return output (loss and error from forward pass,
   # list of gradients from backward pass)
