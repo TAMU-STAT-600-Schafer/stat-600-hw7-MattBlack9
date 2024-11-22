@@ -9,13 +9,13 @@ initialize_bw <- function(p, hidden_p, K, scale = 1e-3, seed = 12345){
   # [ToDo] Initialize intercepts as zeros
   set.seed(seed)
   b1 <- rep(0, hidden_p)
-  b2 <- 0
+  b2 <- rep(0, K)
   
   # [ToDo] Initialize weights by drawing them iid from Normal
   # with mean zero and scale as sd
   W1 <- scale * matrix(rnorm(p * hidden_p), p, hidden_p)
-  W2 <- scale * matrix(rnorm(hidden_p ), hidden_p, 1)
-  
+  W2 <- scale * matrix(rnorm(hidden_p * K), hidden_p, K)
+
   # Return
   return(list(b1 = b1, b2 = b2, W1 = W1, W2 = W2))
 }
