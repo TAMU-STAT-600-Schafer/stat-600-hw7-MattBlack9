@@ -30,7 +30,7 @@ loss_grad_scores <- function(y, scores, K){
   
   # [ToDo] Calculate loss when lambda = 0
   n <- length(y)
-  prob_scores <- exp(scores) / rowSums(exp_scores)  
+  prob_scores <- exp(scores) / rowSums(exp(scores))  
   
   beta <- matrix(0, nrow = n, ncol = K)
   beta[cbind(1:n, y + 1)] <- 1
