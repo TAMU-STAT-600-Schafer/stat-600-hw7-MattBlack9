@@ -40,6 +40,9 @@ loss_grad_scores <- function(y, scores, K){
   # when lambda = 0
   grad <- (scores - y) / m
   
+  
+  
+  
   # Return loss, gradient and misclassification error on training (in %)
   return(list(loss = loss, grad = grad, error = error))
 }
@@ -54,7 +57,8 @@ loss_grad_scores <- function(y, scores, K){
 # b2 - a vector of size K of intercepts
 # lambda - a non-negative scalar, ridge parameter for gradient calculations
 one_pass <- function(X, y, K, W1, b1, W2, b2, lambda){
-
+  n <- nrow(X)
+  
   # [To Do] Forward pass
   # From input to hidden 
   H <- X %*% W1 + matrix(b1, n, length(b1), byrow = T)
@@ -67,19 +71,20 @@ one_pass <- function(X, y, K, W1, b1, W2, b2, lambda){
   
   # [ToDo] Backward pass
   # Get loss, error, gradient at current scores using loss_grad_scores function
-  loss_grad <- loss_grad_regression(y, scores)
+  loss_grad <- loss_grad_scores(y, scores, K)
+  loss <- loss_grad$loss
+  grad_scores <- loss_grad$grad
 
   # Get gradient for 2nd layer W2, b2 (use lambda as needed)
-  dW2 <- crossprod(H, loss_grad$grad)
-  db2 <- sum(loss_grad$grad) 
+  dW2 <- crossprod(H, grad_scores) + lambda * W2  
+  db2 <- colSums(grad_scores)
   
   # Get gradient for hidden, and 1st layer W1, b1 (use lambda as needed)
-  dH <- tcrossprod(loss_grad$grad, W2)
-  dA1 <- dH
-  dA1 <- (abs(dA1) + dA1) / 2
-  dW1 <- crossprod(X, dA1)
+  dH <- tcrossprod(grad_scores, W2)  
+  dA1 <- dH * (H > 0)  
+  dW1 <- crossprod(X, dA1) + lambda * W1  
   db1 <- colSums(dA1)
-  
+
   # Return output (loss and error from forward pass,
   # list of gradients from backward pass)
   return(list(loss = out$loss, error = out$error, grads = list(dW1 = dW1, db1 = db1, dW2 = dW2, db2 = db2)))
@@ -95,9 +100,15 @@ one_pass <- function(X, y, K, W1, b1, W2, b2, lambda){
 # b2 - a vector of size K of intercepts
 evaluate_error <- function(Xval, yval, W1, b1, W2, b2){
   # [ToDo] Forward pass to get scores on validation data
+  H <- Xval %*% W1 + matrix(b1, nrow = nrow(Xval), ncol = length(b1), byrow = TRUE)
+  H[H < 0] <- 0  
+  scores <- H %*% W2 + b2
+  
+  predictions <- apply(scores, 1, which.max) - 1
   
   # [ToDo] Evaluate error rate (in %) when 
   # comparing scores-based predictions with true yval
+  error <- mean(predictions != yval) * 100
   
   return(error)
 }
