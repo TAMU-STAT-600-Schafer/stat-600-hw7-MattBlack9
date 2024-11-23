@@ -29,19 +29,23 @@ initialize_bw <- function(p, hidden_p, K, scale = 1e-3, seed = 12345){
 loss_grad_scores <- function(y, scores, K){
   
   # [ToDo] Calculate loss when lambda = 0
-  m <- length(y)
-  loss <- mean((y - scores)^2) / 2
+  n <- length(y)
+  exp_scores <- exp(scores) 
+  prob_scores <- exp_scores / rowSums(exp_scores)  
+  
+  beta <- matrix(0, nrow = n, ncol = K)
+  beta[cbind(1:n, y + 1)] <- 1
+  
+  loss <- -sum(diag(tcrossprod(beta, log(prob_scores)))) / n
   
   # [ToDo] Calculate misclassification error rate (%)
   # when predicting class labels using scores versus true y
-  # error = ...
+  y_preds <- max.col(prob_scores, ties.method = 'first') - 1
+  error <- (sum(y_preds != y) / n) * 100
   
   # [ToDo] Calculate gradient of loss with respect to scores (output)
   # when lambda = 0
-  grad <- (scores - y) / m
-  
-  
-  
+  grad <- (prob_scores - beta) / n
   
   # Return loss, gradient and misclassification error on training (in %)
   return(list(loss = loss, grad = grad, error = error))
@@ -81,7 +85,7 @@ one_pass <- function(X, y, K, W1, b1, W2, b2, lambda){
   
   # Get gradient for hidden, and 1st layer W1, b1 (use lambda as needed)
   dH <- tcrossprod(grad_scores, W2)  
-  dA1 <- dH * (H > 0)  
+  dA1 <- dH * (H > 0) 
   dW1 <- crossprod(X, dA1) + lambda * W1  
   db1 <- colSums(dA1)
 
@@ -102,9 +106,8 @@ evaluate_error <- function(Xval, yval, W1, b1, W2, b2){
   # [ToDo] Forward pass to get scores on validation data
   H <- Xval %*% W1 + matrix(b1, nrow = nrow(Xval), ncol = length(b1), byrow = TRUE)
   H[H < 0] <- 0  
-  scores <- H %*% W2 + b2
-  
-  predictions <- apply(scores, 1, which.max) - 1
+  scores <- H %*% W2 + matrix(b2, nrow = nrow(Xval), ncol = length(b2), byrow = TRUE)
+  predictions <- max.col(scores, ties.method = 'first') - 1
   
   # [ToDo] Evaluate error rate (in %) when 
   # comparing scores-based predictions with true yval
@@ -136,6 +139,11 @@ NN_train <- function(X, y, Xval, yval, lambda = 0.01,
 
   # [ToDo] Initialize b1, b2, W1, W2 using initialize_bw with seed as seed,
   # and determine any necessary inputs from supplied ones
+  initial <- initialize_bw(ncol(X), hidden_p, scale, seed)
+  b1 <- initial$b1
+  b2 <- initial$b2
+  W1 <- initial$W1
+  W2 <- initial$W2
   
   # Initialize storage for error to monitor convergence
   error = rep(NA, nEpoch)
@@ -150,6 +158,7 @@ NN_train <- function(X, y, Xval, yval, lambda = 0.01,
     # [ToDo] For each batch
     #  - do one_pass to determine current error and gradients
     #  - perform SGD step to update the weights and intercepts
+    
     
     # [ToDo] In the end of epoch, evaluate
     # - average training error across batches
