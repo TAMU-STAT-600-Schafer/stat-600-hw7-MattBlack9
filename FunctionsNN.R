@@ -13,8 +13,8 @@ initialize_bw <- function(p, hidden_p, K, scale = 1e-3, seed = 12345){
   
   # [ToDo] Initialize weights by drawing them iid from Normal
   # with mean zero and scale as sd
-  W1 <- scale * matrix(rnorm(p * hidden_p), p, hidden_p)
-  W2 <- scale * matrix(rnorm(hidden_p * K), hidden_p, K)
+  W1 <- scale * matrix(rnorm(p * hidden_p), nrow = p, ncol = hidden_p)
+  W2 <- scale * matrix(rnorm(hidden_p * K), nrow = hidden_p, ncol = K)
 
   # Return
   return(list(b1 = b1, b2 = b2, W1 = W1, W2 = W2))
@@ -30,13 +30,12 @@ loss_grad_scores <- function(y, scores, K){
   
   # [ToDo] Calculate loss when lambda = 0
   n <- length(y)
-  exp_scores <- exp(scores) 
-  prob_scores <- exp_scores / rowSums(exp_scores)  
+  prob_scores <- exp(scores) / rowSums(exp_scores)  
   
   beta <- matrix(0, nrow = n, ncol = K)
   beta[cbind(1:n, y + 1)] <- 1
   
-  loss <- -sum(diag(tcrossprod(beta, log(prob_scores)))) / n
+  loss <- -sum(diag(crossprod(log(prob_scores), beta))) / n
   
   # [ToDo] Calculate misclassification error rate (%)
   # when predicting class labels using scores versus true y
@@ -61,17 +60,17 @@ loss_grad_scores <- function(y, scores, K){
 # b2 - a vector of size K of intercepts
 # lambda - a non-negative scalar, ridge parameter for gradient calculations
 one_pass <- function(X, y, K, W1, b1, W2, b2, lambda){
-  n <- nrow(X)
+  n <- length(y)
   
   # [To Do] Forward pass
   # From input to hidden 
-  H <- X %*% W1 + matrix(b1, n, length(b1), byrow = T)
+  H <- X %*% W1 + matrix(b1, nrow = n, ncol = length(b1), byrow = TRUE)
   
   # ReLU
-  H[H < 0] <- 0
+  H <- (abs(H) + H)/2
   
   # From hidden to output scores
-  scores <- H %*% W2 + b2
+  scores <- H %*% W2 + matrix(b2, nrow = n, ncol = length(b2), byrow = TRUE)
   
   # [ToDo] Backward pass
   # Get loss, error, gradient at current scores using loss_grad_scores function
@@ -85,9 +84,9 @@ one_pass <- function(X, y, K, W1, b1, W2, b2, lambda){
   
   # Get gradient for hidden, and 1st layer W1, b1 (use lambda as needed)
   dH <- tcrossprod(grad_scores, W2)  
-  dA1 <- dH * (H > 0) 
-  dW1 <- crossprod(X, dA1) + lambda * W1  
-  db1 <- colSums(dA1)
+  dH[H == 0] <- 0 
+  dW1 <- crossprod(X, dH) + lambda * W1  
+  db1 <- colSums(dH)
 
   # Return output (loss and error from forward pass,
   # list of gradients from backward pass)
@@ -116,7 +115,6 @@ evaluate_error <- function(Xval, yval, W1, b1, W2, b2){
   return(error)
 }
 
-
 # Full training
 ################################################
 # X - n by p training data
@@ -139,7 +137,8 @@ NN_train <- function(X, y, Xval, yval, lambda = 0.01,
 
   # [ToDo] Initialize b1, b2, W1, W2 using initialize_bw with seed as seed,
   # and determine any necessary inputs from supplied ones
-  initial <- initialize_bw(ncol(X), hidden_p, scale, seed)
+  K <- length(unique(y))
+  initial <- initialize_bw(ncol(X), hidden_p, K, scale, seed)
   b1 <- initial$b1
   b2 <- initial$b2
   W1 <- initial$W1
@@ -151,6 +150,7 @@ NN_train <- function(X, y, Xval, yval, lambda = 0.01,
   
   # Set seed for reproducibility
   set.seed(seed)
+
   # Start iterations
   for (i in 1:nEpoch){
     # Allocate bathes
@@ -158,11 +158,28 @@ NN_train <- function(X, y, Xval, yval, lambda = 0.01,
     # [ToDo] For each batch
     #  - do one_pass to determine current error and gradients
     #  - perform SGD step to update the weights and intercepts
-    
+    cur_error <- 0
+    for (j in 1:nBatch){
+      # Get error and gradient on the batch
+      pass <- one_pass(X[batchids == j, ], y[batchids == j], K, W1, b1, W2, b2, lambda)
+      
+      # Keep track of error
+      cur_error <- cur_error + pass$error
+      
+      # [ToDo] Make an update of W1, b1, W2, b2
+      W1 <- W1 - rate * pass$grads$dW1
+      b1 <- b1 - rate * pass$grads$db1
+      W2 <- W2 - rate * pass$grads$dW2
+      b2 <- b2 - rate * pass$grads$db2
+      
+    }
     
     # [ToDo] In the end of epoch, evaluate
     # - average training error across batches
     # - validation error using evaluate_error function
+    error[i] <- cur_error / nBatch
+    error_val[i] <- evaluate_error(Xval, yval, W1, b1, W2, b2)
+
   }
   # Return end result
   return(list(error = error, error_val = error_val, params =  list(W1 = W1, b1 = b1, W2 = W2, b2 = b2)))
